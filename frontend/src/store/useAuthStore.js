@@ -29,7 +29,7 @@ export const useAuthStore = create((set, get) => ({
       });
 
       const savedUser = userStr ? JSON.parse(userStr) : null;
-      if (token && savedUser) {
+      if (token && savedUser && savedUser.role !== 'super-admin') {
         api.get('/settings')
           .then((res) => {
             const hospital = res.data?.data?.hospital;
