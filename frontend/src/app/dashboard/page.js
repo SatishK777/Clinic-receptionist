@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import api from '../../services/api.js';
 import DashboardLayout from '../../components/DashboardLayout.js';
+import { useAuthStore } from '../../store/useAuthStore.js';
 import {
   Phone,
   Calendar,
@@ -27,16 +29,54 @@ import {
 } from 'recharts';
 
 export default function DashboardOverview() {
+  const { user } = useAuthStore();
+  const [tenantReady, setTenantReady] = useState(user?.role !== 'super-admin');
+
+  useEffect(() => {
+    if (user?.role !== 'super-admin') {
+      setTenantReady(true);
+      return;
+    }
+
+    let isMounted = true;
+    api.get('/hospitals')
+      .then((res) => {
+        if (!isMounted) return;
+
+        const hospitals = res.data?.data || [];
+        const savedTenantId = localStorage.getItem('activeTenantId');
+        const savedTenantIsValid = hospitals.some((hospital) => hospital._id === savedTenantId);
+        const nextTenantId = savedTenantIsValid ? savedTenantId : hospitals[0]?._id || '';
+
+        if (nextTenantId) {
+          localStorage.setItem('activeTenantId', nextTenantId);
+        } else {
+          localStorage.removeItem('activeTenantId');
+        }
+
+        setTenantReady(true);
+      })
+      .catch(() => {
+        if (isMounted) setTenantReady(true);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.role]);
+
   const { data: analytics, isLoading, error } = useQuery({
-    queryKey: ['dashboardAnalytics'],
+    queryKey: ['dashboardAnalytics', user?.role],
     queryFn: async () => {
       const res = await api.get('/analytics/dashboard');
       return res.data.data;
     },
-    refetchInterval: 3000,
+    enabled: tenantReady,
+    retry: 1,
+    refetchInterval: false,
   });
 
-  if (isLoading) {
+  if (!tenantReady || isLoading) {
     return (
       <DashboardLayout>
         <div className="flex h-[60vh] items-center justify-center">
