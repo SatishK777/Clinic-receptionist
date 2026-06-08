@@ -65,10 +65,11 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
           const savedTenantId = typeof window !== 'undefined'
             ? localStorage.getItem('activeTenantId')
             : '';
-          const nextTenantId = savedTenantId || hospitalList[0]?._id || '';
+          const savedTenantIsValid = hospitalList.some((hospital) => hospital._id === savedTenantId);
+          const nextTenantId = savedTenantIsValid ? savedTenantId : hospitalList[0]?._id || '';
 
           setActiveTenant(nextTenantId);
-          if (nextTenantId && !savedTenantId && typeof window !== 'undefined') {
+          if (nextTenantId && (!savedTenantId || !savedTenantIsValid) && typeof window !== 'undefined') {
             localStorage.setItem('activeTenantId', nextTenantId);
           }
         })

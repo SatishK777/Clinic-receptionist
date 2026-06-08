@@ -1,4 +1,5 @@
 import { ErrorResponse } from './error.js';
+import mongoose from 'mongoose';
 
 export const resolveTenant = (req, res, next) => {
   if (!req.user) {
@@ -9,6 +10,9 @@ export const resolveTenant = (req, res, next) => {
   if (req.user.role === 'super-admin') {
     const tenantId = req.headers['x-tenant-id'] || req.query.hospitalId;
     if (tenantId) {
+      if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+        return next(new ErrorResponse('Invalid tenant id', 400));
+      }
       req.hospitalId = tenantId;
     } else {
       req.hospitalId = null; // Access global analytics or hospital profiles
