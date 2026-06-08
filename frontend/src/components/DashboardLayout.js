@@ -40,7 +40,8 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout, theme, toggleTheme } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeTenant, setActiveTenant] = useState('metrohealth');
+  const [activeTenant, setActiveTenant] = useState('');
+  const [hospitals, setHospitals] = useState([]);
   const [clinicName, setClinicName] = useState(clinicNameOverride || user?.hospitalName || 'Clinic');
 
   useEffect(() => {
@@ -53,6 +54,33 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
     if (!isAuthenticated) return;
 
     let isMounted = true;
+    if (user?.role === 'super-admin') {
+      api.get('/hospitals')
+        .then((res) => {
+          if (!isMounted) return;
+
+          const hospitalList = res.data?.data || [];
+          setHospitals(hospitalList);
+
+          const savedTenantId = typeof window !== 'undefined'
+            ? localStorage.getItem('activeTenantId')
+            : '';
+          const nextTenantId = savedTenantId || hospitalList[0]?._id || '';
+
+          setActiveTenant(nextTenantId);
+          if (nextTenantId && !savedTenantId && typeof window !== 'undefined') {
+            localStorage.setItem('activeTenantId', nextTenantId);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setHospitals([]);
+        });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
     if (clinicNameOverride) {
       setClinicName(clinicNameOverride);
       return () => {
@@ -113,7 +141,7 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
   const handleTenantChange = (tenantId) => {
     setActiveTenant(tenantId);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('activeTenantId', tenantId === 'metrohealth' ? '' : tenantId);
+      localStorage.setItem('activeTenantId', tenantId);
       // Reload page to refresh all active queries with new tenant headers
       window.location.reload();
     }
@@ -234,9 +262,11 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
                   onChange={(e) => handleTenantChange(e.target.value)}
                   className="bg-secondary text-foreground text-sm font-semibold rounded-lg border-0 py-1.5 px-3 focus:ring-2 focus:ring-primary"
                 >
-                  <option value="metrohealth">Metro Health Center</option>
-                  <option value="66554433221100f0f0f0f0f1">St. Jude Cardiac Clinic</option>
-                  <option value="66554433221100f0f0f0f0f2">Oakwood Pediatric Clinic</option>
+                  {hospitals.map((hospital) => (
+                    <option key={hospital._id} value={hospital._id}>
+                      {hospital.name}
+                    </option>
+                  ))}
                 </select>
                 <span className="hidden sm:inline bg-primary/10 text-primary text-xs font-semibold px-2 py-0.5 rounded-full">
                   Super Admin View

@@ -13,6 +13,7 @@ import aiAgentRoutes from './routes/aiAgentRoutes.js';
 import phoneNumberRoutes from './routes/phoneNumberRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import hospitalRoutes from './routes/hospitalRoutes.js';
 
 const app = express();
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
@@ -52,6 +53,7 @@ app.use('/api/v1/ai-agents', aiAgentRoutes);
 app.use('/api/v1/phone-numbers', phoneNumberRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/hospitals', hospitalRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
