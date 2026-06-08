@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }) {
   const { user, isAuthenticated, isLoading, logout, theme, toggleTheme } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeTenant, setActiveTenant] = useState('metrohealth');
-  const [clinicName, setClinicName] = useState('Clinic');
+  const [clinicName, setClinicName] = useState(user?.hospitalName || 'Clinic');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -53,6 +53,10 @@ export default function DashboardLayout({ children }) {
     if (!isAuthenticated) return;
 
     let isMounted = true;
+    if (user?.hospitalName) {
+      setClinicName(user.hospitalName);
+    }
+
     api.get('/settings')
       .then((res) => {
         const hospitalName = res.data?.data?.hospital?.name;
@@ -69,7 +73,7 @@ export default function DashboardLayout({ children }) {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, user?.role]);
+  }, [isAuthenticated, user?.hospitalName, user?.role]);
 
   if (isLoading || !isAuthenticated) {
     return (

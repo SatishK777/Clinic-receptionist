@@ -88,6 +88,8 @@ export const register = async (req, res, next) => {
         email: user.email,
         role: user.role,
         hospitalId: user.hospitalId,
+        hospitalName: hospital.name,
+        hospitalSubdomain: hospital.subdomain,
       },
     });
   } catch (error) {
@@ -122,6 +124,8 @@ export const login = async (req, res, next) => {
       return next(new ErrorResponse('User account is suspended or inactive', 403));
     }
 
+    const hospital = user.hospitalId ? await Hospital.findById(user.hospitalId) : null;
+
     // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -140,6 +144,8 @@ export const login = async (req, res, next) => {
         email: user.email,
         role: user.role,
         hospitalId: user.hospitalId,
+        hospitalName: hospital?.name,
+        hospitalSubdomain: hospital?.subdomain,
       },
     });
   } catch (error) {
