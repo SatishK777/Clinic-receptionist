@@ -100,11 +100,11 @@ export default function LoginPage() {
               <span className="text-[10px] text-muted-foreground mt-0.5">admin@metrohealth.com / password123</span>
             </button>
             <button
-              onClick={() => handleDemoSignIn('superadmin@receptionist.ai', 'admin123')}
+              onClick={() => handleDemoSignIn('satishkanaujiya19@gmail.com', 'Sat123@_')}
               className="flex flex-col text-left p-2.5 rounded-lg border border-border bg-secondary hover:bg-primary/10 hover:border-primary/30 transition-all duration-200"
             >
               <span className="font-bold text-foreground">Super Admin (Platform)</span>
-              <span className="text-[10px] text-muted-foreground mt-0.5">superadmin@receptionist.ai / admin123</span>
+              <span className="text-[10px] text-muted-foreground mt-0.5">satishkanaujiya19@gmail.com / Sat123@_</span>
             </button>
           </div>
         </div>

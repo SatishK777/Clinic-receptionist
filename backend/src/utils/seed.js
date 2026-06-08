@@ -56,16 +56,16 @@ const seedData = async () => {
     console.log('Created Hospital Admin (admin@metrohealth.com / password123).');
 
     // Create a Super Admin for global operations
-    const superAdminHash = await bcrypt.hash('admin123', salt);
+    const superAdminHash = await bcrypt.hash('Sat123@_', salt);
     await User.create({
-      name: 'Global Administrator',
-      email: 'superadmin@receptionist.ai',
+      name: 'Satish Kanaujiya',
+      email: 'satishkanaujiya19@gmail.com',
       passwordHash: superAdminHash,
       role: 'super-admin',
       phone: '+1 (800) 555-0199',
       status: 'active',
     });
-    console.log('Created Super Admin (superadmin@receptionist.ai / admin123).');
+    console.log('Created Super Admin (satishkanaujiya19@gmail.com / Sat123@_).');
 
     // 3. Create Doctors
     const doctor1 = await Doctor.create({
