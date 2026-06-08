@@ -59,9 +59,21 @@ export default function DashboardLayout({ children }) {
 
     api.get('/settings')
       .then((res) => {
-        const hospitalName = res.data?.data?.hospital?.name;
-        if (isMounted && hospitalName) {
-          setClinicName(hospitalName);
+        const hospital = res.data?.data?.hospital;
+        if (isMounted && hospital?.name) {
+          setClinicName(hospital.name);
+        }
+
+        if (hospital?.name && typeof window !== 'undefined') {
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            const nextUser = {
+              ...JSON.parse(storedUser),
+              hospitalName: hospital.name,
+              hospitalSubdomain: hospital.subdomain,
+            };
+            localStorage.setItem('user', JSON.stringify(nextUser));
+          }
         }
       })
       .catch(() => {

@@ -27,6 +27,24 @@ export const useAuthStore = create((set, get) => ({
         theme: savedTheme,
         isLoading: false,
       });
+
+      const savedUser = userStr ? JSON.parse(userStr) : null;
+      if (token && savedUser) {
+        api.get('/settings')
+          .then((res) => {
+            const hospital = res.data?.data?.hospital;
+            if (!hospital?.name) return;
+
+            const nextUser = {
+              ...savedUser,
+              hospitalName: hospital.name,
+              hospitalSubdomain: hospital.subdomain,
+            };
+            localStorage.setItem('user', JSON.stringify(nextUser));
+            set({ user: nextUser });
+          })
+          .catch(() => {});
+      }
     }
   },
 
