@@ -107,7 +107,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout clinicNameOverride={hospitalObj.name}>
       <div className="space-y-6">
         {/* HEADER */}
         <div>

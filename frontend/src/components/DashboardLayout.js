@@ -35,13 +35,13 @@ const navItems = [
   { name: 'Settings', path: '/dashboard/settings', icon: Settings, roles: ['super-admin', 'hospital-admin'] },
 ];
 
-export default function DashboardLayout({ children }) {
+export default function DashboardLayout({ children, clinicNameOverride = '' }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout, theme, toggleTheme } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeTenant, setActiveTenant] = useState('metrohealth');
-  const [clinicName, setClinicName] = useState(user?.hospitalName || 'Clinic');
+  const [clinicName, setClinicName] = useState(clinicNameOverride || user?.hospitalName || 'Clinic');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -53,6 +53,13 @@ export default function DashboardLayout({ children }) {
     if (!isAuthenticated) return;
 
     let isMounted = true;
+    if (clinicNameOverride) {
+      setClinicName(clinicNameOverride);
+      return () => {
+        isMounted = false;
+      };
+    }
+
     if (user?.hospitalName) {
       setClinicName(user.hospitalName);
     }
@@ -85,7 +92,7 @@ export default function DashboardLayout({ children }) {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, user?.hospitalName, user?.role]);
+  }, [clinicNameOverride, isAuthenticated, user?.hospitalName, user?.role]);
 
   if (isLoading || !isAuthenticated) {
     return (
