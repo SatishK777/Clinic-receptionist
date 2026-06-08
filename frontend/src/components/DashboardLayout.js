@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/useAuthStore.js';
+import api from '../services/api.js';
 import Link from 'next/link';
 import {
   LayoutDashboard,
@@ -40,12 +41,35 @@ export default function DashboardLayout({ children }) {
   const { user, isAuthenticated, isLoading, logout, theme, toggleTheme } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeTenant, setActiveTenant] = useState('metrohealth');
+  const [clinicName, setClinicName] = useState('Clinic');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
   }, [isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let isMounted = true;
+    api.get('/settings')
+      .then((res) => {
+        const hospitalName = res.data?.data?.hospital?.name;
+        if (isMounted && hospitalName) {
+          setClinicName(hospitalName);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setClinicName(user?.role === 'super-admin' ? 'Platform Admin' : 'Clinic');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, user?.role]);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -198,7 +222,7 @@ export default function DashboardLayout({ children }) {
             ) : (
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-primary" />
-                <span className="text-sm font-bold text-foreground">Metro Health Center</span>
+                <span className="text-sm font-bold text-foreground">{clinicName}</span>
               </div>
             )}
           </div>

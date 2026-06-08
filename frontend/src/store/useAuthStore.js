@@ -39,6 +39,7 @@ export const useAuthStore = create((set, get) => ({
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
+      localStorage.removeItem('activeTenantId');
 
       set({
         user,
@@ -64,6 +65,7 @@ export const useAuthStore = create((set, get) => ({
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
+      localStorage.removeItem('activeTenantId');
 
       set({
         user,
