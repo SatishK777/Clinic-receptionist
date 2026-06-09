@@ -125,6 +125,9 @@ export const toVapiAssistantPayload = (agent, existingAssistant = {}) => {
   const voiceProvider = agent.voiceSettings?.provider === 'elevenlabs'
     ? '11labs'
     : agent.voiceSettings?.provider;
+  const serverUrl = process.env.VAPI_WEBHOOK_URL ||
+    existingAssistant.server?.url ||
+    existingAssistant.serverUrl;
 
   return {
     name: agent.name,
@@ -140,8 +143,8 @@ export const toVapiAssistantPayload = (agent, existingAssistant = {}) => {
       ],
       temperature: agent.voiceSettings?.temperature ?? existingModel.temperature ?? 0.7,
       tools: [
-        buildBookAppointmentTool(existingAssistant.server?.url || existingAssistant.serverUrl),
-        buildRescheduleAppointmentTool(existingAssistant.server?.url || existingAssistant.serverUrl),
+        buildBookAppointmentTool(serverUrl),
+        buildRescheduleAppointmentTool(serverUrl),
       ],
     },
     voice: {
