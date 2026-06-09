@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../store/useAuthStore.js';
-import { Activity, ArrowRight, ShieldCheck, Mail, Lock, Building, User } from 'lucide-react';
+import { Activity, ArrowRight, Mail, Lock, Building, User } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,16 +58,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoSignIn = async (demoEmail, demoPassword) => {
-    setErrorMsg('');
-    const res = await login(demoEmail, demoPassword);
-    if (res.success) {
-      router.push('/dashboard');
-    } else {
-      setErrorMsg(res.message);
-    }
-  };
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 transition-colors duration-300">
       <div className="w-full max-w-md space-y-8">
@@ -83,30 +73,6 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {isRegister ? 'Get started with AI front-desk operations' : 'AI voice operating system for clinics & hospitals'}
           </p>
-        </div>
-
-        {/* MOCK DEMO CREDENTIALS ACCORDION */}
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-colors">
-          <div className="flex items-center gap-2 mb-2 font-semibold text-xs text-primary uppercase tracking-wider">
-            <ShieldCheck className="h-4 w-4" />
-            Quick Demo Accounts
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <button
-              onClick={() => handleDemoSignIn('admin@metrohealth.com', 'password123')}
-              className="flex flex-col text-left p-2.5 rounded-lg border border-border bg-secondary hover:bg-primary/10 hover:border-primary/30 transition-all duration-200"
-            >
-              <span className="font-bold text-foreground">Hospital Admin</span>
-              <span className="text-[10px] text-muted-foreground mt-0.5">admin@metrohealth.com / password123</span>
-            </button>
-            <button
-              onClick={() => handleDemoSignIn('satishkanaujiya19@gmail.com', 'Sat123@_')}
-              className="flex flex-col text-left p-2.5 rounded-lg border border-border bg-secondary hover:bg-primary/10 hover:border-primary/30 transition-all duration-200"
-            >
-              <span className="font-bold text-foreground">Super Admin (Platform)</span>
-              <span className="text-[10px] text-muted-foreground mt-0.5">satishkanaujiya19@gmail.com / Sat123@_</span>
-            </button>
-          </div>
         </div>
 
         {/* AUTH FORM CARD */}
