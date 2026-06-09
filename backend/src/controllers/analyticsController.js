@@ -2,6 +2,15 @@ import Call from '../models/Call.js';
 import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 
+const formatDateKey = (date, timeZone) => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+};
+
 // @desc    Get dashboard metrics and graphs
 // @route   GET /api/v1/analytics/dashboard
 // @access  Private
@@ -49,14 +58,20 @@ export const getDashboardAnalytics = async (req, res, next) => {
       .limit(5);
 
     // 3. Aggregate Call Volume Trends (Last 7 Days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'Asia/Kolkata';
+    const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
 
     const callTrendsAgg = await Call.aggregate([
       { $match: { hospitalId, createdAt: { $gte: sevenDaysAgo } } },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: clinicTimeZone,
+            },
+          },
           calls: { $sum: 1 },
           booked: { $sum: { $cond: [{ $eq: ['$appointmentBooked', true] }, 1, 0] } },
         },
@@ -64,12 +79,18 @@ export const getDashboardAnalytics = async (req, res, next) => {
       { $sort: { _id: 1 } },
     ]);
 
-    // Format trends
-    let callTrends = callTrendsAgg.map((item) => ({
-      date: item._id,
-      calls: item.calls,
-      booked: item.booked,
-    }));
+    const trendMap = new Map(callTrendsAgg.map((item) => [item._id, item]));
+    const callTrends = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(Date.now() - (6 - index) * 24 * 60 * 60 * 1000);
+      const dateKey = formatDateKey(date, clinicTimeZone);
+      const trend = trendMap.get(dateKey);
+
+      return {
+        date: dateKey,
+        calls: trend?.calls || 0,
+        booked: trend?.booked || 0,
+      };
+    });
 
     // 4. Aggregate Sentiment Distribution
     const sentimentAgg = await Call.aggregate([
