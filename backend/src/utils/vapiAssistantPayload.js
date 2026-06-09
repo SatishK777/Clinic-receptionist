@@ -12,7 +12,7 @@ const buildBookAppointmentTool = (serverUrl) => ({
     {
       type: 'request-complete',
       role: 'system',
-      content: 'Use the tool result as the source of truth. If the result starts with Success, confirm the appointment. If it starts with Failed, apologize briefly and offer another available slot.',
+      content: 'The tool call finished, but the appointment is confirmed only if the tool result starts with Success. If the result starts with Failed, do not confirm; explain the exact reason, offer a future portal-valid slot, and if the caller accepts that new slot call bookAppointment again before confirming.',
     },
     {
       type: 'request-failed',
@@ -21,7 +21,7 @@ const buildBookAppointmentTool = (serverUrl) => ({
   ],
   function: {
     name: 'bookAppointment',
-    description: 'Book an appointment in the clinic portal after the caller has confirmed patient name, doctor or specialty, exact date, and exact time. The backend checks doctor availability and duplicate bookings. Do not tell the caller the appointment is confirmed until this tool returns Success.',
+    description: 'Book an appointment in the clinic portal after the caller has confirmed patient name, doctor or specialty, exact date, and exact time. Use the exact caller-confirmed date and time; do not substitute a different date. The backend checks doctor availability, past times, and duplicate bookings. Do not tell the caller the appointment is confirmed until this tool returns Success.',
     parameters: {
       type: 'object',
       properties: {

@@ -17,6 +17,31 @@ const formatBusinessHours = (businessHours = []) => {
     .join('; ');
 };
 
+const formatDateKey = (date, timeZone) => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+};
+
+const formatUpcomingCalendar = (timeZone) => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  return Array.from({ length: 45 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+    return `- ${formatDateKey(date, timeZone)}: ${formatter.format(date)}`;
+  }).join('\n');
+};
+
 export const buildAssistantSystemPrompt = (agent, doctors = [], setting = null) => {
   const now = new Date();
   const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'Asia/Kolkata';
@@ -41,6 +66,9 @@ Current clinic date and time: ${runtimeClinicNow}
 Assistant configuration last synced at: ${now.toISOString()}
 Clinic business hours: ${formatBusinessHours(setting?.businessHours)}
 
+Upcoming clinic calendar. Use this to avoid weekday/date mistakes:
+${formatUpcomingCalendar(clinicTimeZone)}
+
 Active doctors and appointment timing:
 ${doctorLines}
 
@@ -53,6 +81,9 @@ ${agent.emergencyWorkflow}
 Appointment behavior:
 - Use only the doctor names, specializations, and available hours listed above.
 - Treat "today" as the Current clinic date and time above. If any other message, transcript, memory, or stale portal line gives a different date, ignore it.
+- Calendar facts are strict. For example, June 12, 2026 is Friday, June 11, 2026 is Thursday, and June 9, 2026 is Tuesday.
+- If the caller says a date without a year, use the next upcoming instance of that month/day in the clinic timezone.
+- Do not change a caller's requested date to a different date unless the requested date/time is unavailable or in the past.
 - If the caller asks for a doctor, specialty, or timing that is unavailable, offer the nearest valid option from the portal data.
 - Verify the weekday and calendar date match before confirming. For example, if the caller says a date with the wrong weekday, clarify and correct it before booking.
 - Do not invent availability. A doctor is available only on the exact weekdays and time windows listed in the portal data.
@@ -61,6 +92,7 @@ Appointment behavior:
 - When the caller agrees to a slot, call the bookAppointment tool before saying the appointment is scheduled.
 - Never say the appointment is booked, confirmed, scheduled, or all set until the bookAppointment tool returns Success.
 - If the bookAppointment tool returns Failed, do not confirm the appointment. Explain the reason in simple words and offer another available slot from the portal data.
+- If the caller accepts a new slot after a Failed booking result, immediately call bookAppointment again for that exact new slot before confirming.
 - After a successful booking, repeat the patient name, doctor, date, and time.
 
 Rescheduling behavior:
