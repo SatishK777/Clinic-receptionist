@@ -18,8 +18,6 @@ import {
   CalendarCheck,
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -187,20 +185,10 @@ export default function DashboardOverview() {
             </div>
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={normalizedCallTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorCalls" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorBooked" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={normalizedCallTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                  <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={11} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
@@ -209,25 +197,9 @@ export default function DashboardOverview() {
                       borderRadius: '8px',
                     }}
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="calls"
-                    name="Inbound Calls"
-                    stroke="#6366f1"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#colorCalls)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="booked"
-                    name="AI Bookings"
-                    stroke="#10b981"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#colorBooked)"
-                  />
-                </AreaChart>
+                  <Bar dataKey="calls" name="Inbound Calls" fill="#6366f1" radius={[5, 5, 0, 0]} />
+                  <Bar dataKey="booked" name="AI Bookings" fill="#10b981" radius={[5, 5, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>

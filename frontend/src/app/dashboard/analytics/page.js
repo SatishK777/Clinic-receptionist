@@ -12,8 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  AreaChart,
-  Area,
 } from 'recharts';
 import {
   TrendingUp,
@@ -131,10 +129,10 @@ export default function AnalyticsPage() {
             </div>
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={normalizedCallTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={normalizedCallTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                  <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={10} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
@@ -143,9 +141,9 @@ export default function AnalyticsPage() {
                       borderRadius: '8px',
                     }}
                   />
-                  <Area type="monotone" dataKey="booked" stroke="#10b981" fill="#10b981" fillOpacity={0.06} strokeWidth={2} />
-                  <Area type="monotone" dataKey="calls" stroke="#6366f1" fill="#6366f1" fillOpacity={0.03} strokeWidth={2} />
-                </AreaChart>
+                  <Bar dataKey="calls" name="Calls" fill="#6366f1" radius={[5, 5, 0, 0]} />
+                  <Bar dataKey="booked" name="Bookings" fill="#10b981" radius={[5, 5, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
