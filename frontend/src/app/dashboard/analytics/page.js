@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../../../services/api.js';
 import DashboardLayout from '../../../components/DashboardLayout.js';
+import { fillLastSevenTrendDays } from '../../../utils/chartData.js';
 import {
   BarChart,
   Bar,
@@ -45,6 +46,7 @@ export default function AnalyticsPage() {
   }
 
   const { summary, callTrends, sentiment, hourlyDistribution } = analytics || {};
+  const normalizedCallTrends = fillLastSevenTrendDays(callTrends);
 
   return (
     <DashboardLayout>
@@ -129,7 +131,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={callTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={normalizedCallTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
