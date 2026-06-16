@@ -2,6 +2,7 @@ import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DEFAULT_CLINIC_TIMEZONE = process.env.CLINIC_TIMEZONE || 'Asia/Kolkata';
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -49,9 +50,109 @@ const getMinutes = (time = '') => {
   return hours * 60 + minutes;
 };
 
-const isDoctorAvailableAt = (doctor, appointmentTime) => {
-  const dayOfWeek = DAY_NAMES[appointmentTime.getDay()];
-  const minutes = appointmentTime.getHours() * 60 + appointmentTime.getMinutes();
+const getTimeZoneParts = (date, timeZone = DEFAULT_CLINIC_TIMEZONE) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'long',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const value = (type) => parts.find((part) => part.type === type)?.value;
+  let hour = Number(value('hour') || 0);
+  if (hour === 24) hour = 0;
+
+  return {
+    weekday: value('weekday'),
+    year: Number(value('year')),
+    month: Number(value('month')),
+    day: Number(value('day')),
+    hour,
+    minute: Number(value('minute') || 0),
+    second: Number(value('second') || 0),
+  };
+};
+
+const getTimeZoneOffsetMs = (date, timeZone = DEFAULT_CLINIC_TIMEZONE) => {
+  const parts = getTimeZoneParts(date, timeZone);
+  const zonedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+
+  return zonedAsUtc - date.getTime();
+};
+
+const clinicWallTimeToUtc = ({ year, month, day, hour = 0, minute = 0, second = 0 }, timeZone = DEFAULT_CLINIC_TIMEZONE) => {
+  const wallTimeAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  let utcDate = new Date(wallTimeAsUtc);
+
+  for (let index = 0; index < 3; index += 1) {
+    utcDate = new Date(wallTimeAsUtc - getTimeZoneOffsetMs(utcDate, timeZone));
+  }
+
+  return utcDate;
+};
+
+export const parseAppointmentTime = (value, timeZone = DEFAULT_CLINIC_TIMEZONE) => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+  const text = String(value).trim();
+  const wallClockMatch = text.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/
+  );
+
+  if (wallClockMatch) {
+    return clinicWallTimeToUtc({
+      year: Number(wallClockMatch[1]),
+      month: Number(wallClockMatch[2]),
+      day: Number(wallClockMatch[3]),
+      hour: Number(wallClockMatch[4] || 0),
+      minute: Number(wallClockMatch[5] || 0),
+      second: Number(wallClockMatch[6] || 0),
+    }, timeZone);
+  }
+
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getClinicDayRange = (date, timeZone = DEFAULT_CLINIC_TIMEZONE) => {
+  const parts = getTimeZoneParts(date, timeZone);
+  return {
+    start: clinicWallTimeToUtc({
+      year: parts.year,
+      month: parts.month,
+      day: parts.day,
+      hour: 0,
+      minute: 0,
+      second: 0,
+    }, timeZone),
+    end: clinicWallTimeToUtc({
+      year: parts.year,
+      month: parts.month,
+      day: parts.day,
+      hour: 23,
+      minute: 59,
+      second: 59,
+    }, timeZone),
+  };
+};
+
+const isDoctorAvailableAt = (doctor, appointmentTime, timeZone = DEFAULT_CLINIC_TIMEZONE) => {
+  const parts = getTimeZoneParts(appointmentTime, timeZone);
+  const dayOfWeek = parts.weekday;
+  const minutes = parts.hour * 60 + parts.minute;
 
   return doctor.availableHours?.some((slot) => {
     if (slot.dayOfWeek !== dayOfWeek) return false;
@@ -200,13 +301,15 @@ export const createAppointmentFromCall = async ({
   appointmentTime,
   summary,
   reason,
+  dedupePatientDay = false,
+  clinicTimeZone = DEFAULT_CLINIC_TIMEZONE,
 }) => {
   if (!hospitalId) {
     return { created: false, reason: 'Clinic context could not be resolved.' };
   }
 
-  const parsedTime = new Date(appointmentTime);
-  if (!appointmentTime || Number.isNaN(parsedTime.getTime())) {
+  const parsedTime = parseAppointmentTime(appointmentTime, clinicTimeZone);
+  if (!parsedTime) {
     return { created: false, reason: 'No valid appointment time was extracted.' };
   }
 
@@ -220,7 +323,7 @@ export const createAppointmentFromCall = async ({
     return { created: false, reason: 'No active doctor matched the call details.' };
   }
 
-  if (!isDoctorAvailableAt(doctor, parsedTime)) {
+  if (!isDoctorAvailableAt(doctor, parsedTime, clinicTimeZone)) {
     return {
       created: false,
       reason: `${doctor.name} is not available at the requested time.`,
@@ -242,6 +345,41 @@ export const createAppointmentFromCall = async ({
       doctor,
       existing,
     };
+  }
+
+  if (dedupePatientDay) {
+    const phoneDigits = (patientPhone || '').replace(/\D/g, '');
+    const patientRegex = patientName ? new RegExp(escapeRegex(patientName), 'i') : null;
+    const clinicDayRange = getClinicDayRange(parsedTime, clinicTimeZone);
+    const patientDayQuery = {
+      hospitalId,
+      doctorId: doctor._id,
+      appointmentTime: {
+        $gte: clinicDayRange.start,
+        $lte: clinicDayRange.end,
+      },
+      status: { $in: ['scheduled', 'pending'] },
+      $or: [],
+    };
+
+    if (phoneDigits) {
+      patientDayQuery.$or.push({ patientPhone: { $regex: phoneDigits.slice(-10) } });
+    }
+    if (patientRegex) {
+      patientDayQuery.$or.push({ patientName: patientRegex });
+    }
+
+    if (patientDayQuery.$or.length) {
+      const existingPatientAppointment = await Appointment.findOne(patientDayQuery);
+      if (existingPatientAppointment) {
+        return {
+          created: false,
+          reason: 'An appointment for this patient already exists on that clinic date.',
+          doctor,
+          existing: existingPatientAppointment,
+        };
+      }
+    }
   }
 
   const appointment = await Appointment.create({
@@ -268,13 +406,14 @@ export const rescheduleAppointmentFromCall = async ({
   newAppointmentTime,
   summary,
   reason,
+  clinicTimeZone = DEFAULT_CLINIC_TIMEZONE,
 }) => {
   if (!hospitalId) {
     return { updated: false, reason: 'Clinic context could not be resolved.' };
   }
 
-  const parsedNewTime = new Date(newAppointmentTime);
-  if (!newAppointmentTime || Number.isNaN(parsedNewTime.getTime())) {
+  const parsedNewTime = parseAppointmentTime(newAppointmentTime, clinicTimeZone);
+  if (!parsedNewTime) {
     return { updated: false, reason: 'No valid new appointment time was provided.' };
   }
 
@@ -288,7 +427,7 @@ export const rescheduleAppointmentFromCall = async ({
     return { updated: false, reason: 'No active doctor matched the reschedule request.' };
   }
 
-  if (!isDoctorAvailableAt(doctor, parsedNewTime)) {
+  if (!isDoctorAvailableAt(doctor, parsedNewTime, clinicTimeZone)) {
     return {
       updated: false,
       reason: `${doctor.name} is not available at the requested new time.`,
@@ -333,8 +472,8 @@ export const rescheduleAppointmentFromCall = async ({
   }
 
   if (currentAppointmentTime) {
-    const parsedCurrentTime = new Date(currentAppointmentTime);
-    if (!Number.isNaN(parsedCurrentTime.getTime())) {
+    const parsedCurrentTime = parseAppointmentTime(currentAppointmentTime, clinicTimeZone);
+    if (parsedCurrentTime) {
       const windowMs = 2 * 60 * 60 * 1000;
       candidates = candidates.filter((appointment) => {
         return Math.abs(new Date(appointment.appointmentTime).getTime() - parsedCurrentTime.getTime()) <= windowMs;

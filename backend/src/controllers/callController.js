@@ -373,6 +373,7 @@ export const handleVapiWebhook = async (req, res, next) => {
           appointmentTime: structuredData.appointmentTime,
           reason: structuredData.reason,
           summary: callSummary,
+          dedupePatientDay: true,
         });
 
         appointmentBooked = bookingResult.created;

@@ -1,5 +1,7 @@
 import { appointmentAnalysisPlan, buildAssistantSystemPrompt } from './assistantContext.js';
 
+const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'Asia/Kolkata';
+
 const buildBookAppointmentTool = (serverUrl) => ({
   type: 'function',
   async: false,
@@ -43,7 +45,7 @@ const buildBookAppointmentTool = (serverUrl) => ({
         },
         appointmentTime: {
           type: 'string',
-          description: 'The confirmed appointment date and time in ISO 8601 format with timezone when possible.',
+          description: `The confirmed appointment date and time in ISO 8601 format for the clinic timezone (${clinicTimeZone}). Use the caller-confirmed local clinic time; do not convert it to another timezone.`,
         },
         reason: {
           type: 'string',
@@ -98,11 +100,11 @@ const buildRescheduleAppointmentTool = (serverUrl) => ({
         },
         currentAppointmentTime: {
           type: 'string',
-          description: 'The existing appointment date and time in ISO 8601 format, if the caller knows it.',
+          description: `The existing appointment date and time in ISO 8601 format for the clinic timezone (${clinicTimeZone}), if the caller knows it.`,
         },
         newAppointmentTime: {
           type: 'string',
-          description: 'The new confirmed appointment date and time in ISO 8601 format with timezone when possible.',
+          description: `The new confirmed appointment date and time in ISO 8601 format for the clinic timezone (${clinicTimeZone}). Use the caller-confirmed local clinic time; do not convert it to another timezone.`,
         },
         reason: {
           type: 'string',
