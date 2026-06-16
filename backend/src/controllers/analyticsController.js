@@ -58,15 +58,24 @@ export const getDashboardAnalytics = async (req, res, next) => {
       .limit(5);
 
     // 3. Aggregate Call Volume Trends.
-    // If there are no calls in the current trailing week, anchor the chart to the
-    // latest activity so sparse demo/client data still produces a useful chart.
+    // If there is no current-week activity, anchor to the latest call or
+    // appointment so sparse demo/client data still produces a useful chart.
     const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'Asia/Kolkata';
     const currentWindowStart = new Date();
     currentWindowStart.setDate(currentWindowStart.getDate() - 6);
     currentWindowStart.setHours(0, 0, 0, 0);
-    const latestCall = await Call.findOne({ hospitalId }).sort({ createdAt: -1 }).select('createdAt').lean();
-    const trendEndDate = latestCall?.createdAt && latestCall.createdAt < currentWindowStart
-      ? new Date(latestCall.createdAt)
+    const [latestCall, latestAppointment] = await Promise.all([
+      Call.findOne({ hospitalId }).sort({ createdAt: -1 }).select('createdAt').lean(),
+      Appointment.findOne({ hospitalId, status: { $in: ['scheduled', 'pending', 'completed'] } })
+        .sort({ appointmentTime: -1 })
+        .select('appointmentTime')
+        .lean(),
+    ]);
+    const latestActivityDate = [latestCall?.createdAt, latestAppointment?.appointmentTime]
+      .filter(Boolean)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+    const trendEndDate = latestActivityDate && latestActivityDate < currentWindowStart
+      ? new Date(latestActivityDate)
       : new Date();
     trendEndDate.setHours(23, 59, 59, 999);
     const trendStartDate = new Date(trendEndDate);
@@ -85,23 +94,47 @@ export const getDashboardAnalytics = async (req, res, next) => {
             },
           },
           calls: { $sum: 1 },
-          booked: { $sum: { $cond: [{ $eq: ['$appointmentBooked', true] }, 1, 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const appointmentTrendsAgg = await Appointment.aggregate([
+      {
+        $match: {
+          hospitalId,
+          appointmentTime: { $gte: trendStartDate, $lte: trendEndDate },
+          status: { $in: ['scheduled', 'pending', 'completed'] },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$appointmentTime',
+              timezone: clinicTimeZone,
+            },
+          },
+          booked: { $sum: 1 },
         },
       },
       { $sort: { _id: 1 } },
     ]);
 
     const trendMap = new Map(callTrendsAgg.map((item) => [item._id, item]));
+    const appointmentTrendMap = new Map(appointmentTrendsAgg.map((item) => [item._id, item]));
     const callTrends = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(trendStartDate);
       date.setDate(trendStartDate.getDate() + index);
       const dateKey = formatDateKey(date, clinicTimeZone);
       const trend = trendMap.get(dateKey);
+      const appointmentTrend = appointmentTrendMap.get(dateKey);
 
       return {
         date: dateKey,
         calls: trend?.calls || 0,
-        booked: trend?.booked || 0,
+        booked: appointmentTrend?.booked || 0,
       };
     });
 
