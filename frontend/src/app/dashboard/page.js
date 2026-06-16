@@ -6,7 +6,7 @@ import Link from 'next/link';
 import api from '../../services/api.js';
 import DashboardLayout from '../../components/DashboardLayout.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
-import { fillLastSevenTrendDays } from '../../utils/chartData.js';
+import { normalizeTrendDays } from '../../utils/chartData.js';
 import {
   Phone,
   Calendar,
@@ -99,7 +99,7 @@ export default function DashboardOverview() {
   }
 
   const { summary, todayAppointments, callTrends, sentiment, hourlyDistribution } = analytics || {};
-  const normalizedCallTrends = fillLastSevenTrendDays(callTrends);
+  const normalizedCallTrends = normalizeTrendDays(callTrends);
 
   const kpis = [
     {

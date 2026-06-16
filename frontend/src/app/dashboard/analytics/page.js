@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../../../services/api.js';
 import DashboardLayout from '../../../components/DashboardLayout.js';
-import { fillLastSevenTrendDays } from '../../../utils/chartData.js';
+import { normalizeTrendDays } from '../../../utils/chartData.js';
 import {
   BarChart,
   Bar,
@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
   }
 
   const { summary, callTrends, sentiment, hourlyDistribution } = analytics || {};
-  const normalizedCallTrends = fillLastSevenTrendDays(callTrends);
+  const normalizedCallTrends = normalizeTrendDays(callTrends);
 
   return (
     <DashboardLayout>

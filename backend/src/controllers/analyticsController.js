@@ -57,12 +57,24 @@ export const getDashboardAnalytics = async (req, res, next) => {
       .sort({ appointmentTime: 1 })
       .limit(5);
 
-    // 3. Aggregate Call Volume Trends (Last 7 Days)
+    // 3. Aggregate Call Volume Trends.
+    // If there are no calls in the current trailing week, anchor the chart to the
+    // latest activity so sparse demo/client data still produces a useful chart.
     const clinicTimeZone = process.env.CLINIC_TIMEZONE || 'Asia/Kolkata';
-    const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    const currentWindowStart = new Date();
+    currentWindowStart.setDate(currentWindowStart.getDate() - 6);
+    currentWindowStart.setHours(0, 0, 0, 0);
+    const latestCall = await Call.findOne({ hospitalId }).sort({ createdAt: -1 }).select('createdAt').lean();
+    const trendEndDate = latestCall?.createdAt && latestCall.createdAt < currentWindowStart
+      ? new Date(latestCall.createdAt)
+      : new Date();
+    trendEndDate.setHours(23, 59, 59, 999);
+    const trendStartDate = new Date(trendEndDate);
+    trendStartDate.setDate(trendStartDate.getDate() - 6);
+    trendStartDate.setHours(0, 0, 0, 0);
 
     const callTrendsAgg = await Call.aggregate([
-      { $match: { hospitalId, createdAt: { $gte: sevenDaysAgo } } },
+      { $match: { hospitalId, createdAt: { $gte: trendStartDate, $lte: trendEndDate } } },
       {
         $group: {
           _id: {
@@ -81,7 +93,8 @@ export const getDashboardAnalytics = async (req, res, next) => {
 
     const trendMap = new Map(callTrendsAgg.map((item) => [item._id, item]));
     const callTrends = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(Date.now() - (6 - index) * 24 * 60 * 60 * 1000);
+      const date = new Date(trendStartDate);
+      date.setDate(trendStartDate.getDate() + index);
       const dateKey = formatDateKey(date, clinicTimeZone);
       const trend = trendMap.get(dateKey);
 
