@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../../services/api.js';
-import DashboardLayout from '../../../components/DashboardLayout.js';
 import {
   Search,
   Filter,
@@ -93,8 +92,7 @@ export default function CallLogsPage() {
   const totalPages = callsData?.pages || 1;
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 h-full flex flex-col">
+    <div className="space-y-6 h-full flex flex-col">
         {/* HEADER */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Call Inquiries Logs</h1>
@@ -411,7 +409,6 @@ export default function CallLogsPage() {
           </div>
 
         </div>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

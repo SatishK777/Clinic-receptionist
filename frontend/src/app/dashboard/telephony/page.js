@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../services/api.js';
-import DashboardLayout from '../../../components/DashboardLayout.js';
 import {
   Smartphone,
   Plus,
@@ -112,8 +111,7 @@ export default function TelephonyPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* HEADER */}
         <div className="flex justify-between items-center">
           <div>
@@ -303,7 +301,6 @@ export default function TelephonyPage() {
           </div>
         )}
 
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

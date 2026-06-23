@@ -22,25 +22,30 @@ export const getDashboardAnalytics = async (req, res, next) => {
       return res.status(200).json({ success: true, message: 'Super admin dashboard details' });
     }
 
-    // 1. Gather baseline document counts
-    const totalCalls = await Call.countDocuments({ hospitalId });
-    const completedCalls = await Call.countDocuments({ hospitalId, status: 'completed' });
-    const missedCalls = await Call.countDocuments({ hospitalId, status: { $in: ['failed', 'ringing'] } });
-    const appointmentsBooked = await Appointment.countDocuments({ hospitalId });
-    
-    // Calculate booking conversion rate
-    const bookedCalls = await Call.countDocuments({ hospitalId, appointmentBooked: true });
-    const bookingConversionRate = totalCalls > 0 ? Math.round((bookedCalls / totalCalls) * 100) : 0;
-
-    // Calculate AI Success rate (non-escalated completed calls)
-    const escalatedCalls = await Call.countDocuments({ hospitalId, escalated: true });
-    const aiSuccessRate = totalCalls > 0 ? Math.round(((totalCalls - escalatedCalls) / totalCalls) * 100) : 0;
-
-    // Calculate Average Duration
-    const durationStats = await Call.aggregate([
-      { $match: { hospitalId, status: 'completed' } },
-      { $group: { _id: null, avgDuration: { $avg: '$duration' } } },
+    // 1. Gather baseline document counts in parallel
+    const [
+      totalCalls,
+      completedCalls,
+      missedCalls,
+      appointmentsBooked,
+      bookedCalls,
+      escalatedCalls,
+      durationStats,
+    ] = await Promise.all([
+      Call.countDocuments({ hospitalId }),
+      Call.countDocuments({ hospitalId, status: 'completed' }),
+      Call.countDocuments({ hospitalId, status: { $in: ['failed', 'ringing'] } }),
+      Appointment.countDocuments({ hospitalId }),
+      Call.countDocuments({ hospitalId, appointmentBooked: true }),
+      Call.countDocuments({ hospitalId, escalated: true }),
+      Call.aggregate([
+        { $match: { hospitalId, status: 'completed' } },
+        { $group: { _id: null, avgDuration: { $avg: '$duration' } } },
+      ]),
     ]);
+
+    const bookingConversionRate = totalCalls > 0 ? Math.round((bookedCalls / totalCalls) * 100) : 0;
+    const aiSuccessRate = totalCalls > 0 ? Math.round(((totalCalls - escalatedCalls) / totalCalls) * 100) : 0;
     const averageCallDuration = durationStats.length > 0 ? Math.round(durationStats[0].avgDuration) : 0;
 
     // 2. Fetch today's appointments for dashboard table
@@ -49,7 +54,7 @@ export const getDashboardAnalytics = async (req, res, next) => {
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
-    const todayAppointments = await Appointment.find({
+    const todayAppointmentsPromise = Appointment.find({
       hospitalId,
       appointmentTime: { $gte: startOfToday, $lte: endOfToday },
     })
@@ -64,7 +69,8 @@ export const getDashboardAnalytics = async (req, res, next) => {
     const currentWindowStart = new Date();
     currentWindowStart.setDate(currentWindowStart.getDate() - 6);
     currentWindowStart.setHours(0, 0, 0, 0);
-    const [latestCall, latestAppointment] = await Promise.all([
+    const [todayAppointments, latestCall, latestAppointment] = await Promise.all([
+      todayAppointmentsPromise,
       Call.findOne({ hospitalId }).sort({ createdAt: -1 }).select('createdAt').lean(),
       Appointment.findOne({ hospitalId, status: { $in: ['scheduled', 'pending', 'completed'] } })
         .sort({ appointmentTime: -1 })
@@ -82,44 +88,59 @@ export const getDashboardAnalytics = async (req, res, next) => {
     trendStartDate.setDate(trendStartDate.getDate() - 6);
     trendStartDate.setHours(0, 0, 0, 0);
 
-    const callTrendsAgg = await Call.aggregate([
-      { $match: { hospitalId, createdAt: { $gte: trendStartDate, $lte: trendEndDate } } },
-      {
-        $group: {
-          _id: {
-            $dateToString: {
-              format: '%Y-%m-%d',
-              date: '$createdAt',
-              timezone: clinicTimeZone,
+    const [callTrendsAgg, appointmentTrendsAgg, sentimentAgg, hourlyDistributionAgg] = await Promise.all([
+      Call.aggregate([
+        { $match: { hospitalId, createdAt: { $gte: trendStartDate, $lte: trendEndDate } } },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$createdAt',
+                timezone: clinicTimeZone,
+              },
             },
+            calls: { $sum: 1 },
           },
-          calls: { $sum: 1 },
         },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const appointmentTrendsAgg = await Appointment.aggregate([
-      {
-        $match: {
-          hospitalId,
-          appointmentTime: { $gte: trendStartDate, $lte: trendEndDate },
-          status: { $in: ['scheduled', 'pending', 'completed'] },
+        { $sort: { _id: 1 } },
+      ]),
+      Appointment.aggregate([
+        {
+          $match: {
+            hospitalId,
+            appointmentTime: { $gte: trendStartDate, $lte: trendEndDate },
+            status: { $in: ['scheduled', 'pending', 'completed'] },
+          },
         },
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: {
-              format: '%Y-%m-%d',
-              date: '$appointmentTime',
-              timezone: clinicTimeZone,
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$appointmentTime',
+                timezone: clinicTimeZone,
+              },
             },
+            booked: { $sum: 1 },
           },
-          booked: { $sum: 1 },
         },
-      },
-      { $sort: { _id: 1 } },
+        { $sort: { _id: 1 } },
+      ]),
+      Call.aggregate([
+        { $match: { hospitalId } },
+        { $group: { _id: '$sentiment', count: { $sum: 1 } } },
+      ]),
+      Call.aggregate([
+        { $match: { hospitalId } },
+        {
+          $group: {
+            _id: { $hour: '$createdAt' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
     ]);
 
     const trendMap = new Map(callTrendsAgg.map((item) => [item._id, item]));
@@ -138,30 +159,12 @@ export const getDashboardAnalytics = async (req, res, next) => {
       };
     });
 
-    // 4. Aggregate Sentiment Distribution
-    const sentimentAgg = await Call.aggregate([
-      { $match: { hospitalId } },
-      { $group: { _id: '$sentiment', count: { $sum: 1 } } },
-    ]);
-
     const sentiment = { positive: 0, neutral: 0, negative: 0 };
     sentimentAgg.forEach((item) => {
       if (item._id in sentiment) {
         sentiment[item._id] = item.count;
       }
     });
-
-    // 5. Aggregate Hourly Distribution (Busiest Hours)
-    const hourlyDistributionAgg = await Call.aggregate([
-      { $match: { hospitalId } },
-      {
-        $group: {
-          _id: { $hour: '$createdAt' },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
 
     const hourlyDistribution = Array.from({ length: 24 }, (_, i) => ({
       hour: `${i.toString().padStart(2, '0')}:00`,

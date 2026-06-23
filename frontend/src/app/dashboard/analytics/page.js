@@ -2,7 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import api from '../../../services/api.js';
-import DashboardLayout from '../../../components/DashboardLayout.js';
+import { useAuthStore } from '../../../store/useAuthStore.js';
+import { useDashboardShell } from '../../../components/DashboardShellProvider.js';
 import { normalizeTrendDays } from '../../../utils/chartData.js';
 import {
   BarChart,
@@ -24,22 +25,24 @@ import {
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
-  // Fetch dashboard analytics
+  const { user } = useAuthStore();
+  const { activeTenantId, bootstrapReady, isSuperAdmin } = useDashboardShell();
+
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ['dashboardAnalytics'],
+    queryKey: ['dashboardAnalytics', activeTenantId || user?.role],
     queryFn: async () => {
       const res = await api.get('/analytics/dashboard');
       return res.data.data;
     },
+    enabled: isSuperAdmin ? bootstrapReady : true,
+    staleTime: 60_000,
   });
 
-  if (isLoading) {
+  if (!bootstrapReady || isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex h-[60vh] items-center justify-center">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-        </div>
-      </DashboardLayout>
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+      </div>
     );
   }
 
@@ -47,8 +50,7 @@ export default function AnalyticsPage() {
   const normalizedCallTrends = normalizeTrendDays(callTrends);
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* HEADER */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Operational Analytics</h1>
@@ -180,7 +182,6 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

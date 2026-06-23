@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/useAuthStore.js';
-import api from '../services/api.js';
+import { useDashboardShell } from './DashboardShellProvider.js';
 import Link from 'next/link';
 import {
   LayoutDashboard,
@@ -35,14 +35,19 @@ const navItems = [
   { name: 'Settings', path: '/dashboard/settings', icon: Settings, roles: ['super-admin', 'hospital-admin'] },
 ];
 
-export default function DashboardLayout({ children, clinicNameOverride = '' }) {
+export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout, theme, toggleTheme } = useAuthStore();
+  const {
+    userRole,
+    isSuperAdmin,
+    activeTenantId,
+    clinicName,
+    hospitals,
+    bootstrapReady,
+  } = useDashboardShell();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeTenant, setActiveTenant] = useState('');
-  const [hospitals, setHospitals] = useState([]);
-  const [clinicName, setClinicName] = useState(clinicNameOverride || user?.hospitalName || 'Clinic');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -50,80 +55,7 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    let isMounted = true;
-    if (user?.role === 'super-admin') {
-      api.get('/hospitals')
-        .then((res) => {
-          if (!isMounted) return;
-
-          const hospitalList = res.data?.data || [];
-          setHospitals(hospitalList);
-
-          const savedTenantId = typeof window !== 'undefined'
-            ? localStorage.getItem('activeTenantId')
-            : '';
-          const savedTenantIsValid = hospitalList.some((hospital) => hospital._id === savedTenantId);
-          const nextTenantId = savedTenantIsValid ? savedTenantId : hospitalList[0]?._id || '';
-
-          setActiveTenant(nextTenantId);
-          if (nextTenantId && (!savedTenantId || !savedTenantIsValid) && typeof window !== 'undefined') {
-            localStorage.setItem('activeTenantId', nextTenantId);
-          }
-        })
-        .catch(() => {
-          if (isMounted) setHospitals([]);
-        });
-
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    if (clinicNameOverride) {
-      setClinicName(clinicNameOverride);
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    if (user?.hospitalName) {
-      setClinicName(user.hospitalName);
-    }
-
-    api.get('/settings')
-      .then((res) => {
-        const hospital = res.data?.data?.hospital;
-        if (isMounted && hospital?.name) {
-          setClinicName(hospital.name);
-        }
-
-        if (hospital?.name && typeof window !== 'undefined') {
-          const storedUser = localStorage.getItem('user');
-          if (storedUser) {
-            const nextUser = {
-              ...JSON.parse(storedUser),
-              hospitalName: hospital.name,
-              hospitalSubdomain: hospital.subdomain,
-            };
-            localStorage.setItem('user', JSON.stringify(nextUser));
-          }
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setClinicName(user?.role === 'super-admin' ? 'Platform Admin' : 'Clinic');
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [clinicNameOverride, isAuthenticated, user?.hospitalName, user?.role]);
-
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || !isAuthenticated || (isSuperAdmin && !bootstrapReady)) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -140,7 +72,6 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
   };
 
   const handleTenantChange = (tenantId) => {
-    setActiveTenant(tenantId);
     if (typeof window !== 'undefined') {
       localStorage.setItem('activeTenantId', tenantId);
       // Reload page to refresh all active queries with new tenant headers
@@ -148,7 +79,6 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
     }
   };
 
-  const userRole = user?.role || 'hospital-admin';
   const allowedNavItems = navItems.filter((item) => item.roles.includes(userRole));
 
   return (
@@ -255,11 +185,11 @@ export default function DashboardLayout({ children, clinicNameOverride = '' }) {
             </button>
 
             {/* Tenant Selector for Super Admin or Display Clinic Context */}
-            {userRole === 'super-admin' ? (
+            {isSuperAdmin ? (
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-muted-foreground" />
                 <select
-                  value={activeTenant}
+                  value={activeTenantId}
                   onChange={(e) => handleTenantChange(e.target.value)}
                   className="bg-secondary text-foreground text-sm font-semibold rounded-lg border-0 py-1.5 px-3 focus:ring-2 focus:ring-primary"
                 >

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../services/api.js';
-import DashboardLayout from '../../../components/DashboardLayout.js';
+import { useDashboardShell } from '../../../components/DashboardShellProvider.js';
 import {
   Building,
   Clock,
@@ -15,6 +15,7 @@ import {
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [successMsg, setSuccessMsg] = useState('');
+  const { bootstrapReady, isSuperAdmin } = useDashboardShell();
 
   // Fetch hospital profile settings
   const { data: settingsData, isLoading } = useQuery({
@@ -23,35 +24,28 @@ export default function SettingsPage() {
       const res = await api.get('/settings');
       return res.data.data;
     },
+    enabled: !isSuperAdmin || bootstrapReady,
+    staleTime: 5 * 60 * 1000,
   });
 
   const settingsObj = settingsData?.settings || {};
   const hospitalObj = settingsData?.hospital || {};
-
-  // Form States
-  const [hospitalName, setHospitalName] = useState('');
-  const [timezone, setTimezone] = useState('America/New_York');
-  const [businessHours, setBusinessHours] = useState([]);
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [smsEscalations, setSmsEscalations] = useState(false);
-  const [escalationPhone, setEscalationPhone] = useState('');
-
-  // Sync state when settings are loaded
-  const [loaded, setLoaded] = useState(false);
-  if (settingsData && !loaded) {
-    setHospitalName(hospitalObj.name || '');
-    setTimezone(hospitalObj.timezone || 'America/New_York');
-    setBusinessHours(settingsObj.businessHours || []);
-    setEmailAlerts(settingsObj.notifications?.emailAlerts ?? true);
-    setSmsEscalations(settingsObj.notifications?.smsEscalations ?? false);
-    setEscalationPhone(settingsObj.notifications?.escalationPhone || '');
-    setLoaded(true);
-  }
+  const [draft, setDraft] = useState(null);
+  const defaultForm = {
+    hospitalName: hospitalObj.name || '',
+    timezone: hospitalObj.timezone || 'America/New_York',
+    businessHours: settingsObj.businessHours || [],
+    emailAlerts: settingsObj.notifications?.emailAlerts ?? true,
+    smsEscalations: settingsObj.notifications?.smsEscalations ?? false,
+    escalationPhone: settingsObj.notifications?.escalationPhone || '',
+  };
+  const form = draft ?? defaultForm;
 
   // Mutations
   const updateSettingsMutation = useMutation({
     mutationFn: (payload) => api.put('/settings', payload),
     onSuccess: () => {
+      setDraft(null);
       queryClient.invalidateQueries(['settings']);
       setSuccessMsg('Operational settings successfully saved.');
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -61,6 +55,7 @@ export default function SettingsPage() {
   const updateProfileMutation = useMutation({
     mutationFn: (payload) => api.put('/settings/hospital', payload),
     onSuccess: () => {
+      setDraft(null);
       queryClient.invalidateQueries(['settings']);
       setSuccessMsg('Clinic profile metadata successfully updated.');
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -69,46 +64,45 @@ export default function SettingsPage() {
 
   const handleSaveProfile = (e) => {
     e.preventDefault();
-    updateProfileMutation.mutate({ name: hospitalName, timezone });
+    updateProfileMutation.mutate({ name: form.hospitalName, timezone: form.timezone });
   };
 
   const handleSaveConfig = (e) => {
     e.preventDefault();
     updateSettingsMutation.mutate({
-      businessHours,
+      businessHours: form.businessHours,
       notifications: {
-        emailAlerts,
-        smsEscalations,
-        escalationPhone,
+        emailAlerts: form.emailAlerts,
+        smsEscalations: form.smsEscalations,
+        escalationPhone: form.escalationPhone,
       },
     });
   };
 
   const handleHourToggle = (index) => {
-    const updated = [...businessHours];
-    updated[index].isOpen = !updated[index].isOpen;
-    setBusinessHours(updated);
+    const updated = form.businessHours.map((day, dayIndex) => (
+      dayIndex === index ? { ...day, isOpen: !day.isOpen } : day
+    ));
+    setDraft({ ...form, businessHours: updated });
   };
 
   const handleHourChange = (index, field, value) => {
-    const updated = [...businessHours];
-    updated[index][field] = value;
-    setBusinessHours(updated);
+    const updated = form.businessHours.map((day, dayIndex) => (
+      dayIndex === index ? { ...day, [field]: value } : day
+    ));
+    setDraft({ ...form, businessHours: updated });
   };
 
-  if (isLoading) {
+  if (!bootstrapReady || isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex h-[60vh] items-center justify-center">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-        </div>
-      </DashboardLayout>
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout clinicNameOverride={hospitalObj.name}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* HEADER */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Clinic Configurations</h1>
@@ -141,8 +135,8 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       required
-                      value={hospitalName}
-                      onChange={(e) => setHospitalName(e.target.value)}
+                      value={form.hospitalName}
+                      onChange={(e) => setDraft({ ...form, hospitalName: e.target.value })}
                       className="w-full rounded-lg border border-border bg-background py-2 px-3 text-sm text-foreground outline-none focus:border-primary"
                     />
                   </div>
@@ -150,8 +144,8 @@ export default function SettingsPage() {
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-muted-foreground uppercase">Standard Timezone</label>
                     <select
-                      value={timezone}
-                      onChange={(e) => setTimezone(e.target.value)}
+                      value={form.timezone}
+                      onChange={(e) => setDraft({ ...form, timezone: e.target.value })}
                       className="w-full rounded-lg border border-border bg-background py-2 px-3 text-sm text-foreground outline-none focus:border-primary"
                     >
                       <option value="America/New_York">Eastern Time (ET)</option>
@@ -183,7 +177,7 @@ export default function SettingsPage() {
 
               <form onSubmit={handleSaveConfig} className="space-y-4">
                 <div className="space-y-3">
-                  {businessHours.map((day, idx) => (
+                  {form.businessHours.map((day, idx) => (
                     <div
                       key={day._id || idx}
                       className="flex items-center justify-between gap-4 p-3 rounded-xl border border-border/40 bg-secondary/15 flex-wrap"
@@ -245,8 +239,8 @@ export default function SettingsPage() {
                   <label className="flex items-center gap-2.5 p-3 rounded-xl border border-border hover:bg-secondary/40 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={emailAlerts}
-                      onChange={() => setEmailAlerts(!emailAlerts)}
+                    checked={form.emailAlerts}
+                    onChange={() => setDraft({ ...form, emailAlerts: !form.emailAlerts })}
                       className="rounded text-primary focus:ring-primary h-4.5 w-4.5"
                     />
                     <div>
@@ -258,8 +252,8 @@ export default function SettingsPage() {
                   <label className="flex items-center gap-2.5 p-3 rounded-xl border border-border hover:bg-secondary/40 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={smsEscalations}
-                      onChange={() => setSmsEscalations(!smsEscalations)}
+                    checked={form.smsEscalations}
+                    onChange={() => setDraft({ ...form, smsEscalations: !form.smsEscalations })}
                       className="rounded text-primary focus:ring-primary h-4.5 w-4.5"
                     />
                     <div>
@@ -275,8 +269,8 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       placeholder="+1 (555) 901-2345"
-                      value={escalationPhone}
-                      onChange={(e) => setEscalationPhone(e.target.value)}
+                    value={form.escalationPhone}
+                    onChange={(e) => setDraft({ ...form, escalationPhone: e.target.value })}
                       className="w-full rounded-lg border border-border bg-background py-2 px-3 text-sm text-foreground outline-none focus:border-primary"
                     />
                   </div>
@@ -295,7 +289,6 @@ export default function SettingsPage() {
           </div>
 
         </div>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

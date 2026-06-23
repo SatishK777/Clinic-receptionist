@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../services/api.js';
-import DashboardLayout from '../../../components/DashboardLayout.js';
 import {
   Calendar as CalendarIcon,
   List,
@@ -164,8 +163,7 @@ export default function AppointmentsPage() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* HEADER BAR */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -518,7 +516,6 @@ export default function AppointmentsPage() {
           </div>
         )}
 
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import api from '../../services/api.js';
-import DashboardLayout from '../../components/DashboardLayout.js';
 import { useAuthStore } from '../../store/useAuthStore.js';
+import { useDashboardShell } from '../../components/DashboardShellProvider.js';
 import { normalizeTrendDays } from '../../utils/chartData.js';
 import {
   Phone,
@@ -29,72 +28,36 @@ import {
 
 export default function DashboardOverview() {
   const { user } = useAuthStore();
-  const [tenantReady, setTenantReady] = useState(user?.role !== 'super-admin');
-
-  useEffect(() => {
-    if (user?.role !== 'super-admin') {
-      setTenantReady(true);
-      return;
-    }
-
-    let isMounted = true;
-    api.get('/hospitals')
-      .then((res) => {
-        if (!isMounted) return;
-
-        const hospitals = res.data?.data || [];
-        const savedTenantId = localStorage.getItem('activeTenantId');
-        const savedTenantIsValid = hospitals.some((hospital) => hospital._id === savedTenantId);
-        const nextTenantId = savedTenantIsValid ? savedTenantId : hospitals[0]?._id || '';
-
-        if (nextTenantId) {
-          localStorage.setItem('activeTenantId', nextTenantId);
-        } else {
-          localStorage.removeItem('activeTenantId');
-        }
-
-        setTenantReady(true);
-      })
-      .catch(() => {
-        if (isMounted) setTenantReady(true);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.role]);
+  const { activeTenantId, bootstrapReady, isSuperAdmin } = useDashboardShell();
 
   const { data: analytics, isLoading, error } = useQuery({
-    queryKey: ['dashboardAnalytics', user?.role],
+    queryKey: ['dashboardAnalytics', activeTenantId || user?.role],
     queryFn: async () => {
       const res = await api.get('/analytics/dashboard');
       return res.data.data;
     },
-    enabled: tenantReady,
+    enabled: isSuperAdmin ? bootstrapReady : true,
+    staleTime: 60_000,
     retry: 1,
     refetchInterval: false,
   });
 
-  if (!tenantReady || isLoading) {
+  if (!bootstrapReady || isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex h-[60vh] items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p className="text-muted-foreground text-xs font-semibold">Aggregating telemetry charts...</p>
-          </div>
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <p className="text-muted-foreground text-xs font-semibold">Aggregating telemetry charts...</p>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout>
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-          Failed to fetch dashboard metrics. Please ensure the backend is running.
-        </div>
-      </DashboardLayout>
+      <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+        Failed to fetch dashboard metrics. Please ensure the backend is running.
+      </div>
     );
   }
 
@@ -133,8 +96,7 @@ export default function DashboardOverview() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         
         {/* HEADER GREETINGS */}
         <div className="flex flex-col gap-1.5">
@@ -371,7 +333,6 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

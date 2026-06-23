@@ -1,17 +1,7 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useAuthStore } from '../store/useAuthStore.js';
-import QueryProvider from '../components/QueryProvider.js';
+import AppProviders from '../components/AppProviders.js';
 import './globals.css';
 
 export default function RootLayout({ children }) {
-  const initAuth = useAuthStore((state) => state.initAuth);
-
-  useEffect(() => {
-    initAuth();
-  }, [initAuth]);
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head suppressHydrationWarning>
@@ -23,7 +13,7 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body className="antialiased" suppressHydrationWarning>
-        <QueryProvider>{children}</QueryProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
